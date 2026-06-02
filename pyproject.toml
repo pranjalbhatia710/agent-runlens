@@ -1,0 +1,30 @@
+[project]
+name = "agent-runlens"
+version = "0.1.0"
+description = "Local-first CLI for turning AI agent traces into readable timelines and failure reports."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Pranjal Bhatia"}]
+keywords = ["ai-agents", "tracing", "observability", "cli", "cursor", "agent-trace"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Debuggers",
+]
+dependencies = []
+
+[project.scripts]
+agent-runlens = "agent_trace_lens.cli:main"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

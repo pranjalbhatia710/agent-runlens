@@ -1,0 +1,5 @@
+{"timestamp":"2026-06-02T12:00:00Z","type":"agent_start","message":"Debug failing test"}
+{"timestamp":"2026-06-02T12:00:03Z","type":"tool_call","tool":"read_file","message":"Read tests/test_api.py","duration_ms":120}
+{"timestamp":"2026-06-02T12:00:06Z","type":"llm","message":"The failure is a missing edge case","usage":{"input_tokens":821,"output_tokens":142}}
+{"timestamp":"2026-06-02T12:00:08Z","type":"tool_call","tool":"pytest","message":"pytest tests/test_api.py","duration_ms":1840}
+{"timestamp":"2026-06-02T12:00:10Z","type":"error","message":"AssertionError: expected 404, got 500"}
