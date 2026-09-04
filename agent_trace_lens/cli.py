@@ -153,6 +153,7 @@ def build_summary(events: list[Event]) -> dict[str, Any]:
     errors = []
     total_tokens = 0
     durations = []
+    slowest_event: Event | None = None
     for event in events:
         if event.tool:
             tool_counts[event.tool] = tool_counts.get(event.tool, 0) + 1
@@ -161,6 +162,8 @@ def build_summary(events: list[Event]) -> dict[str, Any]:
         total_tokens += event.tokens
         if event.duration_ms is not None:
             durations.append(event.duration_ms)
+            if slowest_event is None or event.duration_ms > (slowest_event.duration_ms or 0):
+                slowest_event = event
     return {
         "events": len(events),
         "tools": tool_counts,
@@ -168,6 +171,7 @@ def build_summary(events: list[Event]) -> dict[str, Any]:
         "error_events": errors,
         "tokens": total_tokens,
         "duration_ms": sum(durations) if durations else None,
+        "slowest_event": slowest_event,
     }
 
 
@@ -181,6 +185,9 @@ def render_text(events: list[Event], *, limit: int = 50) -> str:
     ]
     if summary["duration_ms"] is not None:
         lines.append(f"duration seen: {summary['duration_ms']:.0f} ms")
+    if summary["slowest_event"] is not None:
+        slowest = summary["slowest_event"]
+        lines.append(f"slowest event: {slowest.index:03d} {slowest.event_type} ({slowest.duration_ms:.0f} ms)")
     if summary["tools"]:
         top = ", ".join(f"{name} x{count}" for name, count in sorted(summary["tools"].items(), key=lambda item: (-item[1], item[0]))[:10])
         lines.append(f"tools: {top}")
@@ -215,6 +222,9 @@ def render_markdown(events: list[Event], source: Path, *, limit: int = 100) -> s
     ]
     if summary["duration_ms"] is not None:
         lines.append(f"- Duration observed: {summary['duration_ms']:.0f} ms")
+    if summary["slowest_event"] is not None:
+        slowest = summary["slowest_event"]
+        lines.append(f"- Slowest event: `{slowest.index:03d}` {slowest.event_type} ({slowest.duration_ms:.0f} ms)")
     if summary["tools"]:
         lines.append("- Tools: " + ", ".join(f"`{k}` × {v}" for k, v in sorted(summary["tools"].items())))
     lines.extend(["", "## Failure points"])
@@ -255,7 +265,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.format == "json":
         payload = {
-            "summary": {k: v for k, v in build_summary(events).items() if k != "error_events"},
+            "summary": {
+                k: (v.__dict__ if isinstance(v, Event) else v)
+                for k, v in build_summary(events).items()
+                if k != "error_events"
+            },
             "events": [event.__dict__ for event in events[: args.limit]],
         }
         rendered = json.dumps(payload, indent=2)

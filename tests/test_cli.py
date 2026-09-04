@@ -19,7 +19,11 @@ def test_jsonl_trace_is_loaded_and_summarized(tmp_path: Path):
     assert summary["errors"] == 1
     assert summary["tools"] == {"pytest": 1}
     assert summary["tokens"] == 7
-    assert "pytest" in render_text(events)
+    assert summary["duration_ms"] == 50
+    assert summary["slowest_event"].tool == "pytest"
+    rendered = render_text(events)
+    assert "pytest" in rendered
+    assert "slowest event: 002 tool_call (50 ms)" in rendered
 
 
 def test_nested_agent_trace_shape_is_discovered(tmp_path: Path):
@@ -37,10 +41,11 @@ def test_nested_agent_trace_shape_is_discovered(tmp_path: Path):
 
 def test_markdown_report_contains_mermaid(tmp_path: Path):
     trace = tmp_path / "trace.json"
-    trace.write_text('[{"type":"tool_call","tool":"terminal","text":"run tests"}]', encoding="utf-8")
+    trace.write_text('[{"type":"tool_call","tool":"terminal","text":"run tests","duration_ms":25}]', encoding="utf-8")
 
     events = normalize(load_trace(trace))
     markdown = render_markdown(events, trace)
 
     assert "```mermaid" in markdown
     assert "terminal" in markdown
+    assert "Slowest event: `001` tool_call" in markdown
