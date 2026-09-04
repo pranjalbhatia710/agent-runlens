@@ -255,6 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--format", choices=("text", "markdown", "json"), default="text")
     parser.add_argument("--output", "-o", type=Path, help="Write output to a file")
     parser.add_argument("--limit", type=int, default=50, help="Max timeline events to print")
+    parser.add_argument("--fail-on-error", action="store_true", help="exit 1 when the trace contains error events")
     args = parser.parse_args(argv)
 
     try:
@@ -282,4 +283,4 @@ def main(argv: list[str] | None = None) -> int:
         args.output.write_text(rendered + "\n", encoding="utf-8")
     else:
         print(rendered)
-    return 0
+    return 1 if args.fail_on_error and build_summary(events)["errors"] else 0

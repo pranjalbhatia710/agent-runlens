@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from agent_trace_lens.cli import build_summary, load_trace, normalize, render_markdown, render_text
+from agent_trace_lens.cli import build_summary, load_trace, main, normalize, render_markdown, render_text
 
 
 def test_jsonl_trace_is_loaded_and_summarized(tmp_path: Path):
@@ -49,3 +49,10 @@ def test_markdown_report_contains_mermaid(tmp_path: Path):
     assert "```mermaid" in markdown
     assert "terminal" in markdown
     assert "Slowest event: `001` tool_call" in markdown
+
+
+def test_fail_on_error_returns_nonzero_for_error_traces(tmp_path: Path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text('{"type":"error","message":"Traceback: bad"}\n', encoding="utf-8")
+
+    assert main([str(trace), "--fail-on-error", "--format", "json"]) == 1
