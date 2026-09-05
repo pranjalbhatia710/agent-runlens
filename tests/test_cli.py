@@ -56,3 +56,20 @@ def test_fail_on_error_returns_nonzero_for_error_traces(tmp_path: Path):
     trace.write_text('{"type":"error","message":"Traceback: bad"}\n', encoding="utf-8")
 
     assert main([str(trace), "--fail-on-error", "--format", "json"]) == 1
+
+
+def test_summary_classifies_repeated_tool_and_auth_failures(tmp_path: Path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"type":"tool_call","tool":"gh","message":"gh api user"}\n'
+        '{"type":"tool_call","tool":"gh","message":"gh repo view"}\n'
+        '{"type":"tool_call","tool":"gh","message":"gh issue list"}\n'
+        '{"type":"error","message":"403 forbidden: permission denied"}\n',
+        encoding="utf-8",
+    )
+
+    events = normalize(load_trace(trace))
+    summary = build_summary(events)
+
+    assert summary["failure_categories"] == ["auth-or-permission", "repeated-tool-loop"]
+    assert "failure categories: auth-or-permission, repeated-tool-loop" in render_text(events)

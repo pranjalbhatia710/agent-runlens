@@ -169,10 +169,26 @@ def build_summary(events: list[Event]) -> dict[str, Any]:
         "tools": tool_counts,
         "errors": len(errors),
         "error_events": errors,
+        "failure_categories": classify_failures(events, errors, tool_counts),
         "tokens": total_tokens,
         "duration_ms": sum(durations) if durations else None,
         "slowest_event": slowest_event,
     }
+
+
+def classify_failures(events: list[Event], errors: list[Event], tool_counts: dict[str, int]) -> list[str]:
+    """Return stable high-level failure labels for automation and reports."""
+    labels: set[str] = set()
+    error_text = "\n".join(event.text or "" for event in errors).lower()
+    if any(word in error_text for word in ("401", "403", "unauthorized", "forbidden", "permission denied", "auth")):
+        labels.add("auth-or-permission")
+    if any(word in error_text for word in ("pytest", "test failed", "assertionerror", "ci failed", "build failed")):
+        labels.add("test-or-ci-failure")
+    if any(count >= 3 for count in tool_counts.values()):
+        labels.add("repeated-tool-loop")
+    if errors and not labels:
+        labels.add("unclassified-error")
+    return sorted(labels)
 
 
 def render_text(events: list[Event], *, limit: int = 50) -> str:
@@ -188,6 +204,8 @@ def render_text(events: list[Event], *, limit: int = 50) -> str:
     if summary["slowest_event"] is not None:
         slowest = summary["slowest_event"]
         lines.append(f"slowest event: {slowest.index:03d} {slowest.event_type} ({slowest.duration_ms:.0f} ms)")
+    if summary["failure_categories"]:
+        lines.append("failure categories: " + ", ".join(summary["failure_categories"]))
     if summary["tools"]:
         top = ", ".join(f"{name} x{count}" for name, count in sorted(summary["tools"].items(), key=lambda item: (-item[1], item[0]))[:10])
         lines.append(f"tools: {top}")
@@ -225,6 +243,8 @@ def render_markdown(events: list[Event], source: Path, *, limit: int = 100) -> s
     if summary["slowest_event"] is not None:
         slowest = summary["slowest_event"]
         lines.append(f"- Slowest event: `{slowest.index:03d}` {slowest.event_type} ({slowest.duration_ms:.0f} ms)")
+    if summary["failure_categories"]:
+        lines.append("- Failure categories: " + ", ".join(f"`{label}`" for label in summary["failure_categories"]))
     if summary["tools"]:
         lines.append("- Tools: " + ", ".join(f"`{k}` × {v}" for k, v in sorted(summary["tools"].items())))
     lines.extend(["", "## Failure points"])
