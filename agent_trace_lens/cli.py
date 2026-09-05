@@ -79,14 +79,38 @@ def first_string(obj: dict[str, Any], keys: tuple[str, ...]) -> str | None:
         value = obj.get(key)
         if value is None:
             continue
-        if isinstance(value, str):
-            return one_line(value)
-        if isinstance(value, (int, float, bool)):
-            return str(value)
-        if isinstance(value, dict):
-            nested = first_string(value, keys)
-            if nested:
-                return nested
+        text = stringify_trace_value(value, keys)
+        if text:
+            return text
+    return None
+
+
+def stringify_trace_value(value: Any, keys: tuple[str, ...]) -> str | None:
+    """Extract a readable scalar from nested trace fields.
+
+    Agent traces often store messages as structured content blocks, for example
+    OpenAI-style ``[{"type": "text", "text": "..."}]`` or Anthropic-style
+    ``[{"type": "tool_use", "name": "..."}]``.  Treat those blocks as one
+    collapsed value instead of dropping the event text entirely.
+    """
+    if isinstance(value, str):
+        return one_line(value)
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, dict):
+        nested = first_string(value, keys)
+        if nested:
+            return nested
+        for fallback in ("text", "message", "content", "name", "type"):
+            if fallback in value:
+                nested = stringify_trace_value(value[fallback], keys)
+                if nested:
+                    return nested
+    if isinstance(value, list):
+        parts = [stringify_trace_value(item, keys) for item in value]
+        joined = " ".join(part for part in parts if part)
+        if joined:
+            return one_line(joined)
     return None
 
 

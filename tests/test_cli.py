@@ -39,6 +39,28 @@ def test_nested_agent_trace_shape_is_discovered(tmp_path: Path):
     assert events[0].tool == "browser_click"
 
 
+def test_structured_content_blocks_are_rendered(tmp_path: Path):
+    trace = tmp_path / "content-blocks.json"
+    trace.write_text(
+        """[
+          {
+            "type": "assistant_message",
+            "content": [
+              {"type": "text", "text": "Investigating failure"},
+              {"type": "tool_use", "name": "pytest"}
+            ]
+          }
+        ]""",
+        encoding="utf-8",
+    )
+
+    events = normalize(load_trace(trace))
+    rendered = render_text(events)
+
+    assert events[0].text == "Investigating failure pytest"
+    assert "Investigating failure pytest" in rendered
+
+
 def test_markdown_report_contains_mermaid(tmp_path: Path):
     trace = tmp_path / "trace.json"
     trace.write_text('[{"type":"tool_call","tool":"terminal","text":"run tests","duration_ms":25}]', encoding="utf-8")
