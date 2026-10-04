@@ -298,6 +298,22 @@ def render_markdown(events: list[Event], source: Path, *, limit: int = 100) -> s
     return "\n".join(lines)
 
 
+def event_to_json(event: Event) -> dict[str, Any]:
+    """Return a stable JSON-safe representation of a normalized event."""
+    return {
+        "index": event.index,
+        "path": event.path,
+        "event_type": event.event_type,
+        "timestamp": event.timestamp,
+        "text": event.text,
+        "tool": event.tool,
+        "tokens": event.tokens,
+        "duration_ms": event.duration_ms,
+        "is_error": event.is_error,
+        "raw_keys": event.raw_keys,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Summarize AI agent trace JSON/JSONL files into readable timelines.")
     parser.add_argument("trace", type=Path, help="Path to a trace JSON or JSONL file, or '-' to read from stdin")
@@ -314,13 +330,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.format == "json":
+        summary = build_summary(events)
         payload = {
             "summary": {
                 k: (v.__dict__ if isinstance(v, Event) else v)
-                for k, v in build_summary(events).items()
+                for k, v in summary.items()
                 if k != "error_events"
             },
-            "events": [event.__dict__ for event in events[: args.limit]],
+            "error_events": [event_to_json(event) for event in summary["error_events"][: args.limit]],
+            "events": [event_to_json(event) for event in events[: args.limit]],
         }
         rendered = json.dumps(payload, indent=2)
     elif args.format == "markdown":

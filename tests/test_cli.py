@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from agent_trace_lens.cli import build_summary, load_trace, main, normalize, parse_trace_text, render_markdown, render_text
@@ -98,6 +99,23 @@ def test_fail_on_error_returns_nonzero_for_error_traces(tmp_path: Path):
     trace.write_text('{"type":"error","message":"Traceback: bad"}\n', encoding="utf-8")
 
     assert main([str(trace), "--fail-on-error", "--format", "json"]) == 1
+
+
+def test_json_output_includes_error_event_details(tmp_path: Path, capsys):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"type":"tool_call","tool":"pytest","message":"run tests"}\n'
+        '{"type":"error","message":"AssertionError: bad result"}\n',
+        encoding="utf-8",
+    )
+
+    assert main([str(trace), "--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["summary"]["errors"] == 1
+    assert payload["error_events"][0]["index"] == 2
+    assert payload["error_events"][0]["is_error"] is True
+    assert payload["events"][0]["is_error"] is False
 
 
 def test_summary_classifies_repeated_tool_and_auth_failures(tmp_path: Path):
