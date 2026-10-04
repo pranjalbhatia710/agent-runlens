@@ -24,6 +24,7 @@ agent-runlens = "agent_trace_lens.cli:main"
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
