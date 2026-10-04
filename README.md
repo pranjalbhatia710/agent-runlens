@@ -22,6 +22,12 @@ python -m pip install -e .
 agent-runlens examples/sample-trace.jsonl
 ```
 
+Pipe a trace from another tool without creating a temporary file:
+
+```bash
+cat agent-trace.jsonl | agent-runlens -
+```
+
 Output:
 
 ```text

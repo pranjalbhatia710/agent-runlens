@@ -33,10 +33,7 @@ class Event:
         return any(word in haystack for word in ("error", "exception", "failed", "traceback"))
 
 
-def load_trace(path: Path) -> list[Any]:
-    if not path.exists():
-        raise FileNotFoundError(path)
-    text = path.read_text(encoding="utf-8")
+def parse_trace_text(text: str, source: str) -> list[Any]:
     if not text.strip():
         return []
 
@@ -52,8 +49,16 @@ def load_trace(path: Path) -> list[Any]:
             try:
                 items.append(json.loads(line))
             except json.JSONDecodeError as exc:
-                raise ValueError(f"{path}:{lineno}: not valid JSON or JSONL: {exc}") from exc
+                raise ValueError(f"{source}:{lineno}: not valid JSON or JSONL: {exc}") from exc
         return items
+
+
+def load_trace(path: Path) -> list[Any]:
+    if str(path) == "-":
+        return parse_trace_text(sys.stdin.read(), "<stdin>")
+    if not path.exists():
+        raise FileNotFoundError(path)
+    return parse_trace_text(path.read_text(encoding="utf-8"), str(path))
 
 
 def walk_objects(value: Any, prefix: str = "$", depth: int = 0) -> Iterable[tuple[str, dict[str, Any]]]:
@@ -295,7 +300,7 @@ def render_markdown(events: list[Event], source: Path, *, limit: int = 100) -> s
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Summarize AI agent trace JSON/JSONL files into readable timelines.")
-    parser.add_argument("trace", type=Path, help="Path to a trace JSON or JSONL file")
+    parser.add_argument("trace", type=Path, help="Path to a trace JSON or JSONL file, or '-' to read from stdin")
     parser.add_argument("--format", choices=("text", "markdown", "json"), default="text")
     parser.add_argument("--output", "-o", type=Path, help="Write output to a file")
     parser.add_argument("--limit", type=int, default=50, help="Max timeline events to print")

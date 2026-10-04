@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from agent_trace_lens.cli import build_summary, load_trace, main, normalize, render_markdown, render_text
+from agent_trace_lens.cli import build_summary, load_trace, main, normalize, parse_trace_text, render_markdown, render_text
 
 
 def test_jsonl_trace_is_loaded_and_summarized(tmp_path: Path):
@@ -24,6 +24,26 @@ def test_jsonl_trace_is_loaded_and_summarized(tmp_path: Path):
     rendered = render_text(events)
     assert "pytest" in rendered
     assert "slowest event: 002 tool_call (50 ms)" in rendered
+
+
+def test_parse_trace_text_reports_source_line_for_invalid_jsonl():
+    try:
+        parse_trace_text('{"type":"start"}\nnot-json\n', "stdin")
+    except ValueError as exc:
+        assert "stdin:2: not valid JSON or JSONL" in str(exc)
+    else:  # pragma: no cover - keeps assertion readable without pytest.raises import
+        raise AssertionError("invalid JSONL should raise ValueError")
+
+
+def test_stdin_trace_is_supported(monkeypatch):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"type":"tool_call","tool":"pytest"}\n'))
+
+    events = normalize(load_trace(Path("-")))
+
+    assert len(events) == 1
+    assert events[0].tool == "pytest"
 
 
 def test_nested_agent_trace_shape_is_discovered(tmp_path: Path):
