@@ -314,20 +314,51 @@ def event_to_json(event: Event) -> dict[str, Any]:
     }
 
 
+def filter_events(
+    events: Iterable[Event],
+    *,
+    only_errors: bool = False,
+    min_duration_ms: float | None = None,
+) -> list[Event]:
+    """Return events matching CLI focus filters without renumbering them.
+
+    Keeping original indices makes filtered reports easy to map back to the raw
+    trace while still letting operators suppress noisy short/non-error events.
+    """
+    filtered: list[Event] = []
+    for event in events:
+        if only_errors and not event.is_error:
+            continue
+        if min_duration_ms is not None and (event.duration_ms is None or event.duration_ms < min_duration_ms):
+            continue
+        filtered.append(event)
+    return filtered
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Summarize AI agent trace JSON/JSONL files into readable timelines.")
     parser.add_argument("trace", type=Path, help="Path to a trace JSON or JSONL file, or '-' to read from stdin")
     parser.add_argument("--format", choices=("text", "markdown", "json"), default="text")
     parser.add_argument("--output", "-o", type=Path, help="Write output to a file")
     parser.add_argument("--limit", type=int, default=50, help="Max timeline events to print")
+    parser.add_argument("--only-errors", action="store_true", help="render only events classified as errors")
+    parser.add_argument("--min-duration-ms", type=float, default=None, help="render only events with duration at or above this threshold")
     parser.add_argument("--fail-on-error", action="store_true", help="exit 1 when the trace contains error events")
     args = parser.parse_args(argv)
+
+    if args.limit < 1:
+        raise SystemExit("--limit must be at least 1")
+    if args.min_duration_ms is not None and args.min_duration_ms < 0:
+        raise SystemExit("--min-duration-ms must be zero or greater")
 
     try:
         events = normalize(load_trace(args.trace))
     except Exception as exc:  # deliberate CLI boundary
         print(f"agent-runlens: {exc}", file=sys.stderr)
         return 2
+
+    has_errors = build_summary(events)["errors"] > 0
+    events = filter_events(events, only_errors=args.only_errors, min_duration_ms=args.min_duration_ms)
 
     if args.format == "json":
         summary = build_summary(events)
@@ -350,4 +381,4 @@ def main(argv: list[str] | None = None) -> int:
         args.output.write_text(rendered + "\n", encoding="utf-8")
     else:
         print(rendered)
-    return 1 if args.fail_on_error and build_summary(events)["errors"] else 0
+    return 1 if args.fail_on_error and has_errors else 0

@@ -97,6 +97,13 @@ JSON summary for scripts:
 agent-runlens examples/sample-trace.jsonl --format json
 ```
 
+Focus large traces on failures or slow tool calls:
+
+```bash
+agent-runlens examples/sample-trace.jsonl --only-errors
+agent-runlens examples/sample-trace.jsonl --min-duration-ms 1000 --format json
+```
+
 ## Roadmap
 
 - Real fixtures for Cursor `agent-trace`, Claude Code, Codex, LangGraph, CrewAI, and MCP clients

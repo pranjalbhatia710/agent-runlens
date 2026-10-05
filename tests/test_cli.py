@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from agent_trace_lens.cli import build_summary, load_trace, main, normalize, parse_trace_text, render_markdown, render_text
+from agent_trace_lens.cli import build_summary, filter_events, load_trace, main, normalize, parse_trace_text, render_markdown, render_text
 
 
 def test_jsonl_trace_is_loaded_and_summarized(tmp_path: Path):
@@ -133,3 +133,51 @@ def test_summary_classifies_repeated_tool_and_auth_failures(tmp_path: Path):
 
     assert summary["failure_categories"] == ["auth-or-permission", "repeated-tool-loop"]
     assert "failure categories: auth-or-permission, repeated-tool-loop" in render_text(events)
+
+
+def test_filter_events_can_focus_errors_and_slow_events(tmp_path: Path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"type":"tool_call","tool":"read_file","duration_ms":5}\n'
+        '{"type":"tool_call","tool":"pytest","duration_ms":250}\n'
+        '{"type":"error","message":"AssertionError: bad result","duration_ms":10}\n',
+        encoding="utf-8",
+    )
+
+    events = normalize(load_trace(trace))
+
+    assert [event.index for event in filter_events(events, min_duration_ms=100)] == [2]
+    assert [event.index for event in filter_events(events, only_errors=True)] == [3]
+
+
+def test_cli_filters_json_output_without_hiding_fail_on_error_status(tmp_path: Path, capsys):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"type":"tool_call","tool":"read_file","duration_ms":5}\n'
+        '{"type":"tool_call","tool":"pytest","duration_ms":250}\n'
+        '{"type":"error","message":"AssertionError: bad result","duration_ms":10}\n',
+        encoding="utf-8",
+    )
+
+    assert main([str(trace), "--format", "json", "--min-duration-ms", "100", "--fail-on-error"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["summary"]["events"] == 1
+    assert [event["index"] for event in payload["events"]] == [2]
+    assert payload["summary"]["errors"] == 0
+
+
+def test_cli_rejects_invalid_focus_filters(tmp_path: Path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text('{"type":"tool_call","tool":"pytest"}\n', encoding="utf-8")
+
+    for args, message in [
+        (["--limit", "0"], "--limit must be at least 1"),
+        (["--min-duration-ms", "-1"], "--min-duration-ms must be zero or greater"),
+    ]:
+        try:
+            main([str(trace), *args])
+        except SystemExit as exc:
+            assert str(exc) == message
+        else:
+            raise AssertionError("expected SystemExit")
