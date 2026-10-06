@@ -319,17 +319,21 @@ def filter_events(
     *,
     only_errors: bool = False,
     min_duration_ms: float | None = None,
+    tool: str | None = None,
 ) -> list[Event]:
     """Return events matching CLI focus filters without renumbering them.
 
     Keeping original indices makes filtered reports easy to map back to the raw
     trace while still letting operators suppress noisy short/non-error events.
     """
+    tool_filter = tool.casefold() if tool else None
     filtered: list[Event] = []
     for event in events:
         if only_errors and not event.is_error:
             continue
         if min_duration_ms is not None and (event.duration_ms is None or event.duration_ms < min_duration_ms):
+            continue
+        if tool_filter is not None and (event.tool or "").casefold() != tool_filter:
             continue
         filtered.append(event)
     return filtered
@@ -343,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=50, help="Max timeline events to print")
     parser.add_argument("--only-errors", action="store_true", help="render only events classified as errors")
     parser.add_argument("--min-duration-ms", type=float, default=None, help="render only events with duration at or above this threshold")
+    parser.add_argument("--tool", help="render only events for this normalized tool name, case-insensitive")
     parser.add_argument("--fail-on-error", action="store_true", help="exit 1 when the trace contains error events")
     args = parser.parse_args(argv)
 
@@ -358,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     has_errors = build_summary(events)["errors"] > 0
-    events = filter_events(events, only_errors=args.only_errors, min_duration_ms=args.min_duration_ms)
+    events = filter_events(events, only_errors=args.only_errors, min_duration_ms=args.min_duration_ms, tool=args.tool)
 
     if args.format == "json":
         summary = build_summary(events)

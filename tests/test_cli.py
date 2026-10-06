@@ -135,7 +135,7 @@ def test_summary_classifies_repeated_tool_and_auth_failures(tmp_path: Path):
     assert "failure categories: auth-or-permission, repeated-tool-loop" in render_text(events)
 
 
-def test_filter_events_can_focus_errors_and_slow_events(tmp_path: Path):
+def test_filter_events_can_focus_errors_slow_events_and_tools(tmp_path: Path):
     trace = tmp_path / "trace.jsonl"
     trace.write_text(
         '{"type":"tool_call","tool":"read_file","duration_ms":5}\n'
@@ -148,6 +148,7 @@ def test_filter_events_can_focus_errors_and_slow_events(tmp_path: Path):
 
     assert [event.index for event in filter_events(events, min_duration_ms=100)] == [2]
     assert [event.index for event in filter_events(events, only_errors=True)] == [3]
+    assert [event.index for event in filter_events(events, tool="PYTEST")] == [2]
 
 
 def test_cli_filters_json_output_without_hiding_fail_on_error_status(tmp_path: Path, capsys):
@@ -159,11 +160,12 @@ def test_cli_filters_json_output_without_hiding_fail_on_error_status(tmp_path: P
         encoding="utf-8",
     )
 
-    assert main([str(trace), "--format", "json", "--min-duration-ms", "100", "--fail-on-error"]) == 1
+    assert main([str(trace), "--format", "json", "--min-duration-ms", "100", "--tool", "pytest", "--fail-on-error"]) == 1
     payload = json.loads(capsys.readouterr().out)
 
     assert payload["summary"]["events"] == 1
     assert [event["index"] for event in payload["events"]] == [2]
+    assert payload["events"][0]["tool"] == "pytest"
     assert payload["summary"]["errors"] == 0
 
 

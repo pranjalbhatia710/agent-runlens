@@ -97,10 +97,11 @@ JSON summary for scripts:
 agent-runlens examples/sample-trace.jsonl --format json
 ```
 
-Focus large traces on failures or slow tool calls:
+Focus large traces on failures, specific tools, or slow tool calls:
 
 ```bash
 agent-runlens examples/sample-trace.jsonl --only-errors
+agent-runlens examples/sample-trace.jsonl --tool pytest
 agent-runlens examples/sample-trace.jsonl --min-duration-ms 1000 --format json
 ```
 
