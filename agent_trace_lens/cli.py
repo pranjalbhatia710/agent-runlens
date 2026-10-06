@@ -320,6 +320,7 @@ def filter_events(
     only_errors: bool = False,
     min_duration_ms: float | None = None,
     tool: str | None = None,
+    contains: str | None = None,
 ) -> list[Event]:
     """Return events matching CLI focus filters without renumbering them.
 
@@ -327,6 +328,7 @@ def filter_events(
     trace while still letting operators suppress noisy short/non-error events.
     """
     tool_filter = tool.casefold() if tool else None
+    contains_filter = contains.casefold() if contains else None
     filtered: list[Event] = []
     for event in events:
         if only_errors and not event.is_error:
@@ -335,8 +337,27 @@ def filter_events(
             continue
         if tool_filter is not None and (event.tool or "").casefold() != tool_filter:
             continue
+        if contains_filter is not None and contains_filter not in event_search_text(event):
+            continue
         filtered.append(event)
     return filtered
+
+
+def event_search_text(event: Event) -> str:
+    """Return the case-folded text corpus used by ``--contains`` filtering."""
+    return "\n".join(
+        part
+        for part in (
+            str(event.index),
+            event.path,
+            event.event_type,
+            event.timestamp or "",
+            event.text or "",
+            event.tool or "",
+            " ".join(event.raw_keys),
+        )
+        if part
+    ).casefold()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -348,6 +369,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--only-errors", action="store_true", help="render only events classified as errors")
     parser.add_argument("--min-duration-ms", type=float, default=None, help="render only events with duration at or above this threshold")
     parser.add_argument("--tool", help="render only events for this normalized tool name, case-insensitive")
+    parser.add_argument("--contains", help="render only events whose type, tool, text, path, timestamp, or raw keys contain this text")
     parser.add_argument("--fail-on-error", action="store_true", help="exit 1 when the trace contains error events")
     args = parser.parse_args(argv)
 
@@ -363,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     has_errors = build_summary(events)["errors"] > 0
-    events = filter_events(events, only_errors=args.only_errors, min_duration_ms=args.min_duration_ms, tool=args.tool)
+    events = filter_events(events, only_errors=args.only_errors, min_duration_ms=args.min_duration_ms, tool=args.tool, contains=args.contains)
 
     if args.format == "json":
         summary = build_summary(events)

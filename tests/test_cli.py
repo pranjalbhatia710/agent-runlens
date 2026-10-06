@@ -151,6 +151,37 @@ def test_filter_events_can_focus_errors_slow_events_and_tools(tmp_path: Path):
     assert [event.index for event in filter_events(events, tool="PYTEST")] == [2]
 
 
+def test_filter_events_can_search_event_text_tool_path_and_keys(tmp_path: Path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"type":"agent_step","message":"Need to inspect auth failure","timestamp":"2026-10-06T12:00:00Z"}\n'
+        '{"type":"tool_call","tool":"gh","message":"gh auth status","duration_ms":250}\n'
+        '{"type":"error","message":"403 forbidden","extra_context":{"retryable":false}}\n',
+        encoding="utf-8",
+    )
+
+    events = normalize(load_trace(trace))
+
+    assert [event.index for event in filter_events(events, contains="AUTH")] == [1, 2]
+    assert [event.index for event in filter_events(events, contains="extra_context")] == [3]
+    assert [event.index for event in filter_events(events, contains="$")] == [1, 2, 3]
+
+
+def test_cli_contains_filter_applies_to_json_output(tmp_path: Path, capsys):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"type":"tool_call","tool":"read_file","message":"read docs"}\n'
+        '{"type":"tool_call","tool":"pytest","message":"run auth tests"}\n',
+        encoding="utf-8",
+    )
+
+    assert main([str(trace), "--format", "json", "--contains", "auth"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["summary"]["events"] == 1
+    assert payload["events"][0]["tool"] == "pytest"
+
+
 def test_cli_filters_json_output_without_hiding_fail_on_error_status(tmp_path: Path, capsys):
     trace = tmp_path / "trace.jsonl"
     trace.write_text(

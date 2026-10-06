@@ -97,13 +97,16 @@ JSON summary for scripts:
 agent-runlens examples/sample-trace.jsonl --format json
 ```
 
-Focus large traces on failures, specific tools, or slow tool calls:
+Focus large traces on failures, specific tools, slow tool calls, or events containing a word/phrase:
 
 ```bash
 agent-runlens examples/sample-trace.jsonl --only-errors
 agent-runlens examples/sample-trace.jsonl --tool pytest
 agent-runlens examples/sample-trace.jsonl --min-duration-ms 1000 --format json
+agent-runlens examples/sample-trace.jsonl --contains "permission denied"
 ```
+
+`--contains` searches normalized event type, tool, text, path, timestamp, and raw keys case-insensitively, which is useful when triaging multi-thousand-line agent logs for auth failures, flaky test names, or specific tool calls.
 
 ## Roadmap
 
